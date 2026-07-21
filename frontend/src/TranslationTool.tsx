@@ -214,6 +214,15 @@ export default function TranslationTool() {
           <div className="loading">불러오는 중…</div>
         ) : (
           <table className="grid">
+            <colgroup>
+              <col style={{ width: 76 }} />{/* ID */}
+              <col style={{ width: 170 }} />{/* Note */}
+              <col style={{ width: 170 }} />{/* Note 한국어 */}
+              <col style={{ width: 260 }} />{/* 원문 CN */}
+              <col style={{ width: 260 }} />{/* KR 한국어 */}
+              <col style={{ width: 260 }} />{/* 선택 언어 */}
+              <col style={{ width: 60 }} />{/* 제한 */}
+            </colgroup>
             <thead>
               <tr>
                 <th style={{ position: 'sticky', left: 0, zIndex: 12 }}>ID</th>

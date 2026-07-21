@@ -125,6 +125,8 @@ table.grid {
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
+  min-width: 1100px;
+  table-layout: fixed;
   font-size: 0.83rem;
 }
 table.grid thead th {
@@ -181,7 +183,6 @@ td.editable { background: var(--surface); }
 .cell {
   display: block;
   width: 100%;
-  min-width: 220px;
   min-height: 34px;
   height: 100%;
   padding: 7px 9px;
