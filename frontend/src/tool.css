@@ -12,6 +12,8 @@
   --warn: #fab219;
   --missing-bg: #fdecec;
   --saving: #eda100;
+  --kr-tint: #eef4ff;
+  --kr-tint-head: #dfeafd;
   --border: rgba(11, 11, 11, 0.1);
   color-scheme: light;
 }
@@ -30,6 +32,8 @@
     --warn: #fab219;
     --missing-bg: #3a1f1f;
     --saving: #c98500;
+    --kr-tint: #16273a;
+    --kr-tint-head: #1c3350;
     --border: rgba(255, 255, 255, 0.1);
     color-scheme: dark;
   }
@@ -173,6 +177,10 @@ table.grid tr:hover td.id { background: var(--surface-2); }
   cursor: text;
 }
 .cell:focus { box-shadow: inset 0 0 0 2px var(--accent); background: var(--surface); }
+/* KR 한국어 컬럼 — 원문 CN 바로 오른쪽, 배경 틴트로 강조 */
+th.kr-col { background: var(--kr-tint-head); }
+td.kr-col .cell { background: var(--kr-tint); }
+
 td.empty .cell { background: var(--missing-bg); }
 td.saving { box-shadow: inset 0 0 0 2px var(--saving); }
 td.saved { box-shadow: inset 0 0 0 2px var(--good); transition: box-shadow 0.4s; }

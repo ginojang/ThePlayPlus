@@ -4,12 +4,13 @@ import { getStats, getTexts, patchCell, type Row, type LangStat } from './api';
 
 const nf = new Intl.NumberFormat('ko-KR');
 
-// 편집 대상 언어 컬럼 (원문 CN 은 읽기전용 소스)
+// KR 한국어 = 주 번역 대상. 원문 CN 바로 오른쪽에 배치 + 배경색 강조.
+const KR: { col: keyof Row; label: string } = { col: 'kr', label: 'KR 한국어' };
+// 나머지 편집 대상 언어 컬럼 (원문 CN 은 읽기전용 소스)
 const TARGETS: { col: keyof Row; label: string }[] = [
   { col: 'en', label: 'EN 영어' },
   { col: 'jp', label: 'JP 일본어' },
   { col: 'cnt', label: 'CNT 번체' },
-  { col: 'kr', label: 'KR 한국어' },
   { col: 'vn', label: 'VN 베트남' },
   { col: 'pt', label: 'PT 포르투갈' },
   { col: 'th', label: 'TH 태국' },
@@ -19,6 +20,7 @@ const SEARCH_FIELDS = [
   { v: '', label: '전체' },
   { v: 'text_id', label: 'ID' },
   { v: 'cn', label: '원문(CN)' },
+  { v: KR.col as string, label: KR.label },
   ...TARGETS.map((t) => ({ v: t.col as string, label: t.label })),
   { v: 'note', label: 'Note' },
 ];
@@ -28,11 +30,13 @@ function EditableCell({
   col,
   onSaved,
   onError,
+  tdClass = '',
 }: {
   row: Row;
   col: keyof Row;
   onSaved: (id: number, col: keyof Row, v: string) => void;
   onError: (msg: string) => void;
+  tdClass?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const initial = (row[col] as string | null) ?? '';
@@ -59,7 +63,7 @@ function EditableCell({
 
   const empty = initial === '';
   return (
-    <td className={`${empty ? 'empty' : ''} ${status}`}>
+    <td className={`${tdClass} ${empty ? 'empty' : ''} ${status}`}>
       <div
         className="cell"
         contentEditable
@@ -214,6 +218,7 @@ export default function TranslationTool() {
                 <th>Note</th>
                 <th className="tgt">Note 한국어</th>
                 <th>원문 CN</th>
+                <th className="tgt kr-col">{KR.label}</th>
                 {TARGETS.map((t) => (
                   <th key={t.col} className="tgt">
                     {t.label}
@@ -229,6 +234,13 @@ export default function TranslationTool() {
                   <td className="note">{r.note}</td>
                   <EditableCell row={r} col="note_kr" onSaved={onSaved} onError={setErr} />
                   <td className="src">{r.cn}</td>
+                  <EditableCell
+                    row={r}
+                    col={KR.col}
+                    onSaved={onSaved}
+                    onError={setErr}
+                    tdClass="kr-col"
+                  />
                   {TARGETS.map((t) => (
                     <EditableCell
                       key={t.col}
