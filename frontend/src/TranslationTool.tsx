@@ -63,7 +63,7 @@ function EditableCell({
 
   const empty = initial === '';
   return (
-    <td className={`${tdClass} ${empty ? 'empty' : ''} ${status}`}>
+    <td className={`editable ${tdClass} ${empty ? 'empty' : ''} ${status}`}>
       <div
         className="cell"
         contentEditable
