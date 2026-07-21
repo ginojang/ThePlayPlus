@@ -140,6 +140,17 @@ table.grid thead th {
   white-space: nowrap;
 }
 table.grid th.tgt { color: var(--text); }
+.col-select {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
 table.grid td {
   padding: 0;
   border-bottom: 1px solid var(--grid);

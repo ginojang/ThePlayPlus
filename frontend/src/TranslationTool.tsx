@@ -97,6 +97,8 @@ export default function TranslationTool() {
   const [missing, setMissing] = useState('');
   const [limit, setLimit] = useState(100);
   const [offset, setOffset] = useState(0);
+  // EN 이후 7개 언어 중 표시할 하나 (헤더 드롭다운으로 선택)
+  const [activeTarget, setActiveTarget] = useState<keyof Row>('en');
 
   const refreshStats = useCallback(() => {
     getStats().then(setStats).catch(() => {});
@@ -219,11 +221,20 @@ export default function TranslationTool() {
                 <th className="tgt">Note 한국어</th>
                 <th>원문 CN</th>
                 <th className="tgt kr-col">{KR.label}</th>
-                {TARGETS.map((t) => (
-                  <th key={t.col} className="tgt">
-                    {t.label}
-                  </th>
-                ))}
+                <th className="tgt">
+                  <select
+                    className="col-select"
+                    value={activeTarget as string}
+                    onChange={(e) => setActiveTarget(e.target.value as keyof Row)}
+                    title="표시할 언어 선택"
+                  >
+                    {TARGETS.map((t) => (
+                      <option key={t.col} value={t.col as string}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </th>
                 <th>제한</th>
               </tr>
             </thead>
@@ -241,15 +252,13 @@ export default function TranslationTool() {
                     onError={setErr}
                     tdClass="kr-col"
                   />
-                  {TARGETS.map((t) => (
-                    <EditableCell
-                      key={t.col}
-                      row={r}
-                      col={t.col}
-                      onSaved={onSaved}
-                      onError={setErr}
-                    />
-                  ))}
+                  <EditableCell
+                    key={activeTarget}
+                    row={r}
+                    col={activeTarget}
+                    onSaved={onSaved}
+                    onError={setErr}
+                  />
                   <td className="lim">{r.char_limit}</td>
                 </tr>
               ))}
