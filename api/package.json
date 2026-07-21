@@ -1,0 +1,17 @@
+{
+  "name": "theplayplus-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "여신키우기 번역 툴 백엔드 API (game_texts)",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}

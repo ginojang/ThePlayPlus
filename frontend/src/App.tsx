@@ -1,5 +1,5 @@
-import Dashboard from './Dashboard.tsx';
+import TranslationTool from './TranslationTool.tsx';
 
 export default function App() {
-  return <Dashboard />;
+  return <TranslationTool />;
 }

@@ -1,0 +1,57 @@
+// 프로덕션: nginx 가 /theplayplus/api/ 를 hellcat 백엔드로 프록시.
+// 개발: vite.config 의 proxy 가 /theplayplus/api → localhost:3700 로 전달.
+const API = import.meta.env.VITE_API_BASE || '/theplayplus/api';
+
+export type Row = {
+  text_id: number;
+  note: string | null;
+  cn: string | null;
+  en: string | null;
+  jp: string | null;
+  cnt: string | null;
+  kr: string | null;
+  vn: string | null;
+  pt: string | null;
+  th: string | null;
+  my: string | null;
+  char_limit: string | null;
+};
+
+export type Lang = { code: string; label: string; flag: string };
+export type LangStat = Lang & { filled: number; missing: number; pct: number };
+
+export type ListParams = {
+  q?: string;
+  field?: string;
+  missing?: string;
+  limit: number;
+  offset: number;
+};
+
+async function j<T>(res: Response): Promise<T> {
+  if (!res.ok) throw new Error(`${res.status} ${await res.text().catch(() => '')}`);
+  return res.json() as Promise<T>;
+}
+
+export const getStats = () =>
+  fetch(`${API}/stats`).then(j<{ total_strings: number; languages: LangStat[] }>);
+
+export function getTexts(p: ListParams) {
+  const u = new URLSearchParams();
+  if (p.q) u.set('q', p.q);
+  if (p.field) u.set('field', p.field);
+  if (p.missing) u.set('missing', p.missing);
+  u.set('limit', String(p.limit));
+  u.set('offset', String(p.offset));
+  return fetch(`${API}/texts?${u}`).then(
+    j<{ total: number; limit: number; offset: number; rows: Row[] }>,
+  );
+}
+
+export function patchCell(id: number, col: string, value: string) {
+  return fetch(`${API}/texts/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ col, value }),
+  }).then(j<{ text_id: number; col: string; value: string | null; old: string | null }>);
+}

@@ -10,4 +10,14 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
   },
+  server: {
+    // 개발 시 /theplayplus/api → 로컬 백엔드(3700) 로 프록시
+    proxy: {
+      '/theplayplus/api': {
+        target: 'http://localhost:3700',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/theplayplus\/api/, '/api'),
+      },
+    },
+  },
 });
