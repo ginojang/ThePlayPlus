@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git --version)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=8 -T git@github.com)",
+      "Bash(curl -sI --max-time 8 https://github.com)",
+      "Bash(git ls-remote *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(git config *)",
+      "Bash(psql --version)",
+      "Bash(timeout 5 bash -c 'cat < /dev/null > /dev/tcp/192.168.0.2/5432')",
+      "Bash(export PGPASSWORD='somr#')",
+      "Bash(psql -h 192.168.0.2 -U gino -d postgres -w -c \"SELECT version\\(\\);\")",
+      "Bash(psql -h 192.168.0.2 -U gino -d postgres -w -c \"\\\\l\")",
+      "Bash(psql -h 192.168.0.2 -U gino -d postgres -w -tAc \"SELECT 1 FROM pg_database WHERE datname='ThePlayPlus';\")",
+      "Bash(psql -h 192.168.0.2 -U gino -d postgres -w -c 'CREATE DATABASE \"ThePlayPlus\" WITH OWNER = gino ENCODING = '\"'\"'UTF8'\"'\"';')",
+      "Bash(psql -h 192.168.0.2 -U gino -d ThePlayPlus -w -c \"SELECT current_database\\(\\), current_user, version\\(\\);\")",
+      "Bash(npm -v)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(git check-ignore *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Add TypeScript project scaffold with PostgreSQL connection *)",
+      "Bash(git push *)"
+    ]
+  }
+}

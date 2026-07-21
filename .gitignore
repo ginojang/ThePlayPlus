@@ -1,2 +1,17 @@
 # Claude Code local settings
 .claude/settings.local.json
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment / secrets
+.env
+.env.local
+*.local
+
+# Logs
+*.log
+npm-debug.log*
