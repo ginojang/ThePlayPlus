@@ -10,8 +10,8 @@ const PORT = Number(process.env.PORT || 3700);
 
 // 편집 가능한 언어/메타 컬럼 화이트리스트 (SQL 인젝션 방지: 컬럼명은 이 집합에서만)
 const LANG_COLS = ['cn', 'en', 'jp', 'cnt', 'kr', 'vn', 'pt', 'th', 'my'];
-const EDITABLE = new Set([...LANG_COLS, 'note', 'char_limit']);
-const SEARCHABLE = ['note', ...LANG_COLS];
+const EDITABLE = new Set([...LANG_COLS, 'note', 'note_kr', 'char_limit']);
+const SEARCHABLE = ['note', 'note_kr', ...LANG_COLS];
 
 const LANG_META = [
   { code: 'kr', label: '한국어', flag: '🇰🇷' },
@@ -81,7 +81,7 @@ app.get('/api/texts', asyncH(async (req, res) => {
 
   params.push(limit, offset);
   const dataRes = await query(
-    `SELECT text_id, note, cn, en, jp, cnt, kr, vn, pt, th, my, char_limit
+    `SELECT text_id, note, note_kr, cn, en, jp, cnt, kr, vn, pt, th, my, char_limit
        FROM game_texts ${whereSql}
        ORDER BY text_id
        LIMIT $${params.length - 1} OFFSET $${params.length}`,

@@ -5,6 +5,7 @@ const API = import.meta.env.VITE_API_BASE || '/theplayplus/api';
 export type Row = {
   text_id: number;
   note: string | null;
+  note_kr: string | null;
   cn: string | null;
   en: string | null;
   jp: string | null;

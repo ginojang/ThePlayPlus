@@ -212,6 +212,7 @@ export default function TranslationTool() {
               <tr>
                 <th style={{ position: 'sticky', left: 0, zIndex: 12 }}>ID</th>
                 <th>Note</th>
+                <th className="tgt">Note 한국어</th>
                 <th>원문 CN</th>
                 {TARGETS.map((t) => (
                   <th key={t.col} className="tgt">
@@ -226,6 +227,7 @@ export default function TranslationTool() {
                 <tr key={r.text_id}>
                   <td className="id">{r.text_id}</td>
                   <td className="note">{r.note}</td>
+                  <EditableCell row={r} col="note_kr" onSaved={onSaved} onError={setErr} />
                   <td className="src">{r.cn}</td>
                   {TARGETS.map((t) => (
                     <EditableCell
