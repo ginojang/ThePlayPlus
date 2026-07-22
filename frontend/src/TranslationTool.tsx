@@ -10,7 +10,7 @@ import {
   getPrompt,
   putPrompt,
   type Row,
-  type LangStat,
+  type Stats,
   type TranslateResult,
 } from './api';
 
@@ -441,7 +441,7 @@ function PromptModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function TranslationTool() {
-  const [stats, setStats] = useState<{ total_strings: number; languages: LangStat[] } | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -518,6 +518,7 @@ export default function TranslationTool() {
 
   const onFlagCleared = (id: number) => {
     setRows((rs) => rs.map((r) => (r.text_id === id ? { ...r, flagged: false } : r)));
+    refreshStats();
   };
 
   const page = Math.floor(offset / limit) + 1;
@@ -532,6 +533,22 @@ export default function TranslationTool() {
           <h1>여신키우기 · 번역 툴</h1>
           <span className="sub">game_texts · {stats ? nf.format(stats.total_strings) : '…'}개 문자열</span>
           <div className="chips">
+            {stats?.flags && stats.flags.baseline > 0 && (
+              <span
+                className="review-prog"
+                title={`검토 필요 ${nf.format(stats.flags.remaining)} · 완료 ${nf.format(stats.flags.reviewed)} / ${nf.format(stats.flags.baseline)}`}
+              >
+                <span className="rp-label">
+                  ⚑ 검토 {nf.format(stats.flags.reviewed)}/{nf.format(stats.flags.baseline)}
+                </span>
+                <span className="rp-bar">
+                  <span
+                    className="rp-fill"
+                    style={{ width: `${(stats.flags.reviewed / stats.flags.baseline) * 100}%` }}
+                  />
+                </span>
+              </span>
+            )}
             {stats?.languages.map((l) => (
               <span
                 key={l.code}

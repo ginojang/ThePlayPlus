@@ -84,6 +84,24 @@ body { margin: 0; }
 .chip b { font-variant-numeric: tabular-nums; }
 .chip.low { color: var(--warn); }
 .chip.full { color: var(--good); }
+.review-prog {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.rp-label { font-size: 0.72rem; font-weight: 600; color: var(--saving); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rp-bar {
+  width: 90px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+}
+.rp-fill { display: block; height: 100%; background: var(--good); border-radius: 3px; transition: width 0.4s; }
 
 /* ── controls ── */
 .controls {

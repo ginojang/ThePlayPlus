@@ -67,7 +67,15 @@ app.get('/api/stats', asyncH(async (_req, res) => {
     const filled = Number(r[l.code]);
     return { ...l, filled, missing: total - filled, pct: total ? +(filled / total * 100).toFixed(1) : 0 };
   });
-  res.json({ total_strings: total, languages });
+  const fRem = await query('SELECT count(*) AS n FROM review_flags');
+  const fBase = await query("SELECT value FROM app_settings WHERE key = 'flag_baseline'");
+  const remaining = Number(fRem.rows[0].n);
+  const baseline = fBase.rowCount ? Number(fBase.rows[0].value) : remaining;
+  res.json({
+    total_strings: total,
+    languages,
+    flags: { remaining, baseline, reviewed: Math.max(0, baseline - remaining) },
+  });
 }));
 
 // 텍스트 목록: 검색/필터/페이지네이션

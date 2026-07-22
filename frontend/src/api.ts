@@ -38,8 +38,13 @@ async function j<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const getStats = () =>
-  fetch(`${API}/stats`).then(j<{ total_strings: number; languages: LangStat[] }>);
+export type Stats = {
+  total_strings: number;
+  languages: LangStat[];
+  flags?: { remaining: number; baseline: number; reviewed: number };
+};
+
+export const getStats = () => fetch(`${API}/stats`).then(j<Stats>);
 
 export function getTexts(p: ListParams) {
   const u = new URLSearchParams();
