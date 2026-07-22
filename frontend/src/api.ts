@@ -58,6 +58,17 @@ export function patchCell(id: number, col: string, value: string) {
   }).then(j<{ text_id: number; col: string; value: string | null; old: string | null }>);
 }
 
+export const getPrompt = () =>
+  fetch(`${API}/prompt`).then(j<{ prompt: string; default: string }>);
+
+export function putPrompt(prompt: string) {
+  return fetch(`${API}/prompt`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  }).then(j<{ prompt: string }>);
+}
+
 // teacher(검수 확정 KR) 저장 — 빈 값이면 삭제
 export function putTeacher(id: number, kr: string) {
   return fetch(`${API}/teacher/${id}`, {

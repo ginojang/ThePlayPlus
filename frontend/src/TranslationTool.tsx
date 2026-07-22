@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './tool.css';
-import { getStats, getTexts, patchCell, putTeacher, type Row, type LangStat } from './api';
+import {
+  getStats,
+  getTexts,
+  patchCell,
+  putTeacher,
+  getPrompt,
+  putPrompt,
+  type Row,
+  type LangStat,
+} from './api';
 
 const nf = new Intl.NumberFormat('ko-KR');
 
@@ -174,6 +183,77 @@ function KrCell({
   );
 }
 
+// 번역 프롬프트 편집 모달
+function PromptModal({ onClose }: { onClose: () => void }) {
+  const [text, setText] = useState('');
+  const [def, setDef] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<'' | 'saving' | 'saved' | 'error'>('');
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    getPrompt()
+      .then((d) => {
+        setText(d.prompt);
+        setDef(d.default);
+      })
+      .catch((e) => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    setStatus('saving');
+    try {
+      await putPrompt(text);
+      setStatus('saved');
+      setTimeout(() => onClose(), 500);
+    } catch (e) {
+      setStatus('error');
+      setErr((e as Error).message);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>번역 프롬프트 편집</h2>
+          <button className="tbtn" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        <p className="modal-sub">
+          GPT 번역에 사용되는 시스템 프롬프트입니다. 원문→한국어 번역 규칙을 정의하세요.
+        </p>
+        {loading ? (
+          <div className="loading">불러오는 중…</div>
+        ) : (
+          <textarea
+            className="prompt-area"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            spellCheck={false}
+          />
+        )}
+        <div className="modal-foot">
+          <button className="tbtn" onClick={() => setText(def)} disabled={loading}>
+            기본값으로 되돌리기
+          </button>
+          <div style={{ flex: 1 }} />
+          {err && <span className="err" style={{ color: '#d03b3b' }}>⚠ {err}</span>}
+          {status === 'saved' && <span style={{ color: 'var(--good)' }}>저장됨</span>}
+          <button className="tbtn" onClick={onClose}>
+            취소
+          </button>
+          <button className="tbtn primary" onClick={save} disabled={loading || status === 'saving'}>
+            {status === 'saving' ? '저장 중…' : '저장'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TranslationTool() {
   const [stats, setStats] = useState<{ total_strings: number; languages: LangStat[] } | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
@@ -189,6 +269,7 @@ export default function TranslationTool() {
   const [offset, setOffset] = useState(0);
   // EN 이후 7개 언어 중 표시할 하나 (헤더 드롭다운으로 선택)
   const [activeTarget, setActiveTarget] = useState<keyof Row>('en');
+  const [promptOpen, setPromptOpen] = useState(false);
 
   const refreshStats = useCallback(() => {
     getStats().then(setStats).catch(() => {});
@@ -299,7 +380,15 @@ export default function TranslationTool() {
             다음 ›
           </button>
         </div>
+
+        <div className="promptbar">
+          <button className="tbtn" onClick={() => setPromptOpen(true)}>
+            ⚙ 프롬프트 편집
+          </button>
+        </div>
       </div>
+
+      {promptOpen && <PromptModal onClose={() => setPromptOpen(false)} />}
 
       <div className="tablewrap">
         {loading && rows.length === 0 ? (

@@ -25,6 +25,14 @@ const LANG_META = [
   { code: 'my', label: '말레이어', flag: '🇲🇾' },
 ];
 
+const PROMPT_KEY = 'translate_prompt';
+const DEFAULT_PROMPT = `너는 모바일 게임 '여신키우기'의 전문 번역가다.
+주어진 원문(중국어 또는 영어)을 자연스럽고 간결한 한국어로 번역한다.
+- 게임 UI/대사 맥락을 고려하고 존댓말을 기본으로 한다.
+- {0}, {1} 같은 플레이스홀더와 <color=...></color>, <link=...> 등 태그·서식은 그대로 유지한다.
+- 고유명사/용어는 일관되게 옮긴다.
+- 설명 없이 번역 결과만 출력한다.`;
+
 const asyncH = (fn) => (req, res) => fn(req, res).catch((e) => {
   console.error(e);
   res.status(500).json({ error: e.message });
@@ -155,6 +163,22 @@ app.patch('/api/texts/:id', asyncH(async (req, res) => {
   }
 }));
 
+// 번역 프롬프트 조회/저장
+app.get('/api/prompt', asyncH(async (_req, res) => {
+  const { rows } = await query('SELECT value FROM app_settings WHERE key = $1', [PROMPT_KEY]);
+  res.json({ prompt: rows.length ? rows[0].value : DEFAULT_PROMPT, default: DEFAULT_PROMPT });
+}));
+
+app.put('/api/prompt', asyncH(async (req, res) => {
+  const prompt = String(req.body?.prompt ?? '');
+  await query(
+    `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+    [PROMPT_KEY, prompt],
+  );
+  res.json({ prompt });
+}));
+
 // 최근 편집 이력
 app.get('/api/edits', asyncH(async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
@@ -180,6 +204,13 @@ async function ensureSchema() {
   `);
   // 검색 성능용 인덱스(있으면 무시)
   await query(`CREATE INDEX IF NOT EXISTS idx_edits_text ON game_texts_edits(text_id)`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key        TEXT PRIMARY KEY,
+      value      TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
 }
 
 ensureSchema()

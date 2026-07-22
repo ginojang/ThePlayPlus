@@ -124,6 +124,53 @@ body { margin: 0; }
   white-space: nowrap;
 }
 
+.promptbar { margin-top: 8px; }
+
+/* ── prompt modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  padding: 20px;
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: min(760px, 100%);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; }
+.modal-head h2 { margin: 0; font-size: 1.1rem; }
+.modal-sub { margin: 4px 0 12px; color: var(--muted); font-size: 0.82rem; }
+.prompt-area {
+  flex: 1;
+  min-height: 320px;
+  font: inherit;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  padding: 12px;
+  border: 1px solid var(--grid);
+  border-radius: 10px;
+  background: var(--plane);
+  color: var(--text);
+  resize: vertical;
+  white-space: pre-wrap;
+}
+.modal-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 /* ── table ── */
 .tablewrap { flex: 1; overflow: auto; }
 table.grid {
