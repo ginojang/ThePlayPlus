@@ -21,3 +21,6 @@ npm-debug.log*
 # Data files (원본 엑셀 등 대용량 자산은 커밋 제외)
 *.xlsx
 *.xls
+
+# DB 백업 (대용량, 커밋 제외)
+backups/
