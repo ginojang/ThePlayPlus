@@ -118,6 +118,7 @@ function KrCell({
   onTeacherSaved,
   onClearDraft,
   onFlagCleared,
+  onSaved,
   onError,
 }: {
   row: Row;
@@ -125,12 +126,19 @@ function KrCell({
   onTeacherSaved: (id: number, kr: string | null) => void;
   onClearDraft?: (id: number) => void;
   onFlagCleared?: (id: number) => void;
+  onSaved: (id: number, col: keyof Row, v: string) => void;
   onError: (msg: string) => void;
 }) {
   const base = row.kr ?? '';
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState<'' | 'saving' | 'saved' | 'error'>('');
   const ref = useRef<HTMLDivElement>(null);
+  const baseRef = useRef<HTMLDivElement>(null); // 검토 편집용(플래그 행)
+
+  // 플래그 행: base 를 편집 가능하게, 원본값으로 초기화
+  useEffect(() => {
+    if (row.flagged && baseRef.current) baseRef.current.textContent = base;
+  }, [row.text_id, row.flagged, base]);
   const teacher = row.kr_teacher;
   const hasTeacher = teacher != null && teacher !== '';
   const hasDraft = draft != null;
@@ -193,14 +201,19 @@ function KrCell({
             <span className="flag-before" title="자동 수정 전 원본">전: {row.flag_before}</span>
           )}
           <button
-            className="tbtn"
-            title="검토 완료 — 마킹 해제"
+            className="tbtn primary"
+            title="검토 완료 — 수정했으면 원본 KR 저장 후 마킹 해제"
             onClick={async () => {
               try {
+                const edited = baseRef.current?.textContent ?? base;
+                if (edited !== base) {
+                  await patchCell(row.text_id, 'kr', edited);
+                  onSaved(row.text_id, 'kr', edited);
+                }
                 await clearFlag(row.text_id);
                 onFlagCleared?.(row.text_id);
               } catch (e) {
-                onError(`마킹 해제 실패 (id=${row.text_id}): ${(e as Error).message}`);
+                onError(`검토완료 실패 (id=${row.text_id}): ${(e as Error).message}`);
               }
             }}
           >
@@ -208,9 +221,19 @@ function KrCell({
           </button>
         </div>
       )}
-      <div className="kr-base" title="기본 KR (읽기 전용)">
-        {base}
-      </div>
+      {row.flagged ? (
+        <div
+          className="kr-base edit-base"
+          contentEditable
+          suppressContentEditableWarning
+          ref={baseRef}
+          title="검토 편집 — 수정 후 검토완료를 누르면 원본 KR에 반영됩니다"
+        />
+      ) : (
+        <div className="kr-base" title="기본 KR (읽기 전용)">
+          {base}
+        </div>
+      )}
       {(hasTeacher || editing) && (
         <div className={`kr-teacher ${editing ? 'editing' : ''} ${hasDraft ? 'draft' : ''}`}>
           <span className="kr-teacher-tag">{hasDraft ? 'GPT' : 'T'}</span>
@@ -678,6 +701,7 @@ export default function TranslationTool() {
                     row={r}
                     onTeacherSaved={onTeacherSaved}
                     onFlagCleared={onFlagCleared}
+                    onSaved={onSaved}
                     onError={setErr}
                   />
                   <EditableCell

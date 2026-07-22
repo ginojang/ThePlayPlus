@@ -332,6 +332,14 @@ td.kr-col.flagged { box-shadow: inset 3px 0 0 var(--saving); }
   flex: 1;
   min-width: 80px;
 }
+.kr-base.edit-base {
+  outline: none;
+  cursor: text;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px var(--grid);
+  background: var(--surface);
+}
+.kr-base.edit-base:focus { box-shadow: inset 0 0 0 2px var(--accent); }
 
 /* KR 셀 내부: 기본 KR(읽기전용) + teacher 서브셀 + 버튼 */
 .kr-base {
