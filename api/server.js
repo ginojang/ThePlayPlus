@@ -87,7 +87,39 @@ app.get('/api/texts', asyncH(async (req, res) => {
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
-  res.json({ total, limit, offset, rows: dataRes.rows });
+  const rows = dataRes.rows;
+  // teacher(검수 확정 KR) 값 병합
+  if (rows.length) {
+    const ids = rows.map((r) => String(r.text_id));
+    const tRes = await query(
+      `SELECT text_id, kr FROM kr_teacher WHERE text_id = ANY($1::bigint[])`,
+      [ids],
+    );
+    const map = new Map(tRes.rows.map((r) => [String(r.text_id), r.kr]));
+    for (const r of rows) r.kr_teacher = map.get(String(r.text_id)) ?? null;
+  }
+  res.json({ total, limit, offset, rows });
+}));
+
+// teacher(검수 확정 KR) 업서트 — 빈 값이면 삭제
+app.put('/api/teacher/:id', asyncH(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
+  const kr = req.body?.kr;
+  const val = kr == null || String(kr).trim() === '' ? null : String(kr);
+
+  if (val === null) {
+    await query('DELETE FROM kr_teacher WHERE text_id = $1', [id]);
+    return res.json({ text_id: id, kr: null });
+  }
+  const base = await query('SELECT kr FROM game_texts WHERE text_id = $1', [id]);
+  const baseKr = base.rowCount ? base.rows[0].kr : null;
+  await query(
+    `INSERT INTO kr_teacher (text_id, kr, base_kr, source) VALUES ($1,$2,$3,'tool')
+       ON CONFLICT (text_id) DO UPDATE SET kr = EXCLUDED.kr, source = 'tool', added_at = now()`,
+    [id, val, baseKr],
+  );
+  res.json({ text_id: id, kr: val });
 }));
 
 // 단일 셀 수정 + 편집 이력 기록

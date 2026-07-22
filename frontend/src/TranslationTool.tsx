@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './tool.css';
-import { getStats, getTexts, patchCell, type Row, type LangStat } from './api';
+import { getStats, getTexts, patchCell, putTeacher, type Row, type LangStat } from './api';
 
 const nf = new Intl.NumberFormat('ko-KR');
 
@@ -84,6 +84,96 @@ function EditableCell({
   );
 }
 
+// KR 한국어 셀: 기본 KR(읽기전용) + teacher 서브셀 + [티쳐수정] 버튼
+function KrCell({
+  row,
+  onTeacherSaved,
+  onError,
+}: {
+  row: Row;
+  onTeacherSaved: (id: number, kr: string | null) => void;
+  onError: (msg: string) => void;
+}) {
+  const base = row.kr ?? '';
+  const [editing, setEditing] = useState(false);
+  const [status, setStatus] = useState<'' | 'saving' | 'saved' | 'error'>('');
+  const ref = useRef<HTMLDivElement>(null);
+  const teacher = row.kr_teacher;
+  const hasTeacher = teacher != null && teacher !== '';
+
+  // 편집 시작 시 서브셀 내용 초기화 (teacher 있으면 그 값, 없으면 기본 KR 로 초안)
+  useEffect(() => {
+    if (editing && ref.current) ref.current.textContent = hasTeacher ? (teacher as string) : base;
+  }, [editing, teacher, hasTeacher, base]);
+
+  // 행이 바뀌면 편집상태 해제
+  useEffect(() => {
+    setEditing(false);
+  }, [row.text_id]);
+
+  const save = async () => {
+    const v = ref.current?.textContent ?? '';
+    setStatus('saving');
+    try {
+      const r = await putTeacher(row.text_id, v);
+      onTeacherSaved(row.text_id, r.kr);
+      setEditing(false);
+      setStatus('saved');
+      setTimeout(() => setStatus(''), 700);
+    } catch (e) {
+      setStatus('error');
+      onError(`teacher 저장 실패 (id=${row.text_id}): ${(e as Error).message}`);
+    }
+  };
+
+  return (
+    <td className={`kr-col ${base === '' ? 'empty' : ''} ${status}`}>
+      <div className="kr-base" title="기본 KR (읽기 전용)">
+        {base}
+      </div>
+      {(hasTeacher || editing) && (
+        <div className={`kr-teacher ${editing ? 'editing' : ''}`}>
+          <span className="kr-teacher-tag">T</span>
+          {editing ? (
+            <div
+              className="kr-teacher-edit"
+              contentEditable
+              suppressContentEditableWarning
+              ref={ref}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  save();
+                } else if (e.key === 'Escape') {
+                  setEditing(false);
+                }
+              }}
+            />
+          ) : (
+            <span className="kr-teacher-val">{teacher}</span>
+          )}
+        </div>
+      )}
+      <div className="kr-actions">
+        {editing ? (
+          <>
+            <button className="tbtn primary" onMouseDown={(e) => e.preventDefault()} onClick={save}>
+              저장
+            </button>
+            <button className="tbtn" onClick={() => setEditing(false)}>
+              취소
+            </button>
+          </>
+        ) : (
+          <button className="tbtn" onClick={() => setEditing(true)}>
+            {hasTeacher ? '티쳐수정' : '＋티쳐'}
+          </button>
+        )}
+      </div>
+    </td>
+  );
+}
+
 export default function TranslationTool() {
   const [stats, setStats] = useState<{ total_strings: number; languages: LangStat[] } | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
@@ -135,6 +225,11 @@ export default function TranslationTool() {
     setRows((rs) => rs.map((r) => (r.text_id === id ? { ...r, [col]: v === '' ? null : v } : r)));
     setSavedCount((n) => n + 1);
     refreshStats();
+  };
+
+  const onTeacherSaved = (id: number, kr: string | null) => {
+    setRows((rs) => rs.map((r) => (r.text_id === id ? { ...r, kr_teacher: kr } : r)));
+    setSavedCount((n) => n + 1);
   };
 
   const page = Math.floor(offset / limit) + 1;
@@ -254,13 +349,7 @@ export default function TranslationTool() {
                   <td className="note">{r.note}</td>
                   <EditableCell row={r} col="note_kr" onSaved={onSaved} onError={setErr} />
                   <td className="src">{r.cn}</td>
-                  <EditableCell
-                    row={r}
-                    col={KR.col}
-                    onSaved={onSaved}
-                    onError={setErr}
-                    tdClass="kr-col"
-                  />
+                  <KrCell row={r} onTeacherSaved={onTeacherSaved} onError={setErr} />
                   <EditableCell
                     key={activeTarget}
                     row={r}

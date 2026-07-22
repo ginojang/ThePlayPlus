@@ -6,6 +6,7 @@ export type Row = {
   text_id: number;
   note: string | null;
   note_kr: string | null;
+  kr_teacher: string | null;
   cn: string | null;
   en: string | null;
   jp: string | null;
@@ -55,4 +56,13 @@ export function patchCell(id: number, col: string, value: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ col, value }),
   }).then(j<{ text_id: number; col: string; value: string | null; old: string | null }>);
+}
+
+// teacher(검수 확정 KR) 저장 — 빈 값이면 삭제
+export function putTeacher(id: number, kr: string) {
+  return fetch(`${API}/teacher/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kr }),
+  }).then(j<{ text_id: number; kr: string | null }>);
 }
