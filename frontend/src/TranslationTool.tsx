@@ -19,6 +19,17 @@ const nf = new Intl.NumberFormat('ko-KR');
 const MANUAL_END_ID = 11140503; // '초특가'
 const AUTO_START_ID = 11140504; // '일일 구매 제한'
 
+// 마지막 검색/필터/페이지 위치를 기억 (새로고침 후 복원)
+const VIEW_KEY = 'tpp_view_v1';
+type ViewState = { q: string; field: string; teacherOnly: boolean; limit: number; offset: number };
+function loadView(): Partial<ViewState> {
+  try {
+    return JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
 // KR 한국어 = 주 번역 대상. 원문 CN 바로 오른쪽에 배치 + 배경색 강조.
 const KR: { col: keyof Row; label: string } = { col: 'kr', label: 'KR 한국어' };
 // 나머지 편집 대상 언어 컬럼 (원문 CN 은 읽기전용 소스)
@@ -406,11 +417,12 @@ export default function TranslationTool() {
   const [err, setErr] = useState('');
   const [savedCount, setSavedCount] = useState(0);
 
-  const [q, setQ] = useState('');
-  const [field, setField] = useState('');
-  const [teacherOnly, setTeacherOnly] = useState(false);
-  const [limit, setLimit] = useState(100);
-  const [offset, setOffset] = useState(0);
+  const saved0 = useRef(loadView()).current;
+  const [q, setQ] = useState(saved0.q ?? '');
+  const [field, setField] = useState(saved0.field ?? '');
+  const [teacherOnly, setTeacherOnly] = useState(saved0.teacherOnly ?? false);
+  const [limit, setLimit] = useState(saved0.limit ?? 100);
+  const [offset, setOffset] = useState(saved0.offset ?? 0);
   // EN 이후 7개 언어 중 표시할 하나 (헤더 드롭다운으로 선택)
   const [activeTarget, setActiveTarget] = useState<keyof Row>('en');
   const [promptOpen, setPromptOpen] = useState(false);
@@ -425,16 +437,27 @@ export default function TranslationTool() {
     refreshStats();
   }, [refreshStats]);
 
-  // 검색어 디바운스
-  const [qDebounced, setQDebounced] = useState('');
+  // 검색어 디바운스 (복원 시 초기값도 저장된 q)
+  const [qDebounced, setQDebounced] = useState(saved0.q ?? '');
   useEffect(() => {
     const t = setTimeout(() => setQDebounced(q), 350);
     return () => clearTimeout(t);
   }, [q]);
 
+  // 검색/필터 변경 시 첫 페이지로 — 단, 최초 마운트(복원)에서는 offset 유지
+  const firstReset = useRef(true);
   useEffect(() => {
+    if (firstReset.current) {
+      firstReset.current = false;
+      return;
+    }
     setOffset(0);
   }, [qDebounced, field, teacherOnly, limit]);
+
+  // 뷰 상태를 localStorage 에 저장 (위치 기억)
+  useEffect(() => {
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ q, field, teacherOnly, limit, offset }));
+  }, [q, field, teacherOnly, limit, offset]);
 
   useEffect(() => {
     setLoading(true);
