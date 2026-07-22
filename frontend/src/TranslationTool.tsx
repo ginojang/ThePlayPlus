@@ -261,10 +261,12 @@ function ResultModal({
   data,
   onClose,
   onSaved,
+  onReload,
 }: {
   data: TranslateResult;
   onClose: () => void;
   onSaved: (id: number, col: keyof Row, v: string) => void;
+  onReload: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [text, setText] = useState(data.kr);
@@ -286,6 +288,7 @@ function ResultModal({
     try {
       await patchCell(data.text_id, 'kr', text);
       onSaved(data.text_id, 'kr', text);
+      onReload(); // 저장 후 홈페이지(테이블) 자동 리프레시
       setSaved(true);
       setTimeout(onClose, 600);
     } catch (e) {
@@ -426,8 +429,10 @@ export default function TranslationTool() {
   // EN 이후 7개 언어 중 표시할 하나 (헤더 드롭다운으로 선택)
   const [activeTarget, setActiveTarget] = useState<keyof Row>('en');
   const [promptOpen, setPromptOpen] = useState(false);
-  // GPT 번역 결과 팝업 (DB 저장 안 함)
   const [result, setResult] = useState<TranslateResult | null>(null);
+  // 저장 후 현재 페이지를 DB 에서 다시 불러오기 위한 트리거
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = () => setReloadKey((k) => k + 1);
 
   const refreshStats = useCallback(() => {
     getStats().then(setStats).catch(() => {});
@@ -469,7 +474,7 @@ export default function TranslationTool() {
       })
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
-  }, [qDebounced, field, teacherOnly, limit, offset]);
+  }, [qDebounced, field, teacherOnly, limit, offset, reloadKey]);
 
   const onSaved = (id: number, col: keyof Row, v: string) => {
     setRows((rs) => rs.map((r) => (r.text_id === id ? { ...r, [col]: v === '' ? null : v } : r)));
@@ -559,7 +564,12 @@ export default function TranslationTool() {
 
       {promptOpen && <PromptModal onClose={() => setPromptOpen(false)} />}
       {result && (
-        <ResultModal data={result} onClose={() => setResult(null)} onSaved={onSaved} />
+        <ResultModal
+          data={result}
+          onClose={() => setResult(null)}
+          onSaved={onSaved}
+          onReload={reload}
+        />
       )}
 
       <div className="tablewrap">
