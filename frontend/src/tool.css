@@ -228,6 +228,7 @@ table.grid td.src {
 }
 table.grid td.note { padding: 8px 10px; color: var(--muted); font-size: 0.78rem; max-width: 150px; }
 table.grid td.lim { padding: 8px 10px; color: var(--muted); text-align: center; }
+table.grid td.trans { padding: 8px; text-align: center; vertical-align: middle; }
 table.grid tr:hover td.id { background: var(--surface-2); }
 
 /* editable cell — td 를 배경/칸으로 쓰고, .cell 이 칸을 꽉 채운다 */
@@ -269,6 +270,8 @@ td.empty { background: var(--missing-bg); }
   word-break: break-word;
 }
 .kr-teacher.editing { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.kr-teacher.draft { border-color: var(--saving); border-style: dashed; }
+.kr-teacher.draft .kr-teacher-tag { background: var(--saving); }
 .kr-teacher-tag {
   position: absolute;
   left: 5px;

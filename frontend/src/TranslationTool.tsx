@@ -5,6 +5,7 @@ import {
   getTexts,
   patchCell,
   putTeacher,
+  translateRow,
   getPrompt,
   putPrompt,
   type Row,
@@ -96,11 +97,15 @@ function EditableCell({
 // KR 한국어 셀: 기본 KR(읽기전용) + teacher 서브셀 + [티쳐수정] 버튼
 function KrCell({
   row,
+  draft,
   onTeacherSaved,
+  onClearDraft,
   onError,
 }: {
   row: Row;
+  draft?: string;
   onTeacherSaved: (id: number, kr: string | null) => void;
+  onClearDraft: (id: number) => void;
   onError: (msg: string) => void;
 }) {
   const base = row.kr ?? '';
@@ -109,16 +114,28 @@ function KrCell({
   const ref = useRef<HTMLDivElement>(null);
   const teacher = row.kr_teacher;
   const hasTeacher = teacher != null && teacher !== '';
+  const hasDraft = draft != null;
 
-  // 편집 시작 시 서브셀 내용 초기화 (teacher 있으면 그 값, 없으면 기본 KR 로 초안)
+  // GPT 초안(draft)이 오면 편집 모드로 진입
   useEffect(() => {
-    if (editing && ref.current) ref.current.textContent = hasTeacher ? (teacher as string) : base;
-  }, [editing, teacher, hasTeacher, base]);
+    if (hasDraft) setEditing(true);
+  }, [hasDraft]);
+
+  // 편집 시작 시 서브셀 내용 초기화 (초안 있으면 초안, 없으면 teacher, 없으면 기본 KR)
+  useEffect(() => {
+    if (editing && ref.current)
+      ref.current.textContent = hasDraft ? (draft as string) : hasTeacher ? (teacher as string) : base;
+  }, [editing, draft, hasDraft, teacher, hasTeacher, base]);
 
   // 행이 바뀌면 편집상태 해제
   useEffect(() => {
     setEditing(false);
   }, [row.text_id]);
+
+  const cancel = () => {
+    setEditing(false);
+    if (hasDraft) onClearDraft(row.text_id);
+  };
 
   const save = async () => {
     const v = ref.current?.textContent ?? '';
@@ -126,6 +143,7 @@ function KrCell({
     try {
       const r = await putTeacher(row.text_id, v);
       onTeacherSaved(row.text_id, r.kr);
+      if (hasDraft) onClearDraft(row.text_id);
       setEditing(false);
       setStatus('saved');
       setTimeout(() => setStatus(''), 700);
@@ -141,8 +159,8 @@ function KrCell({
         {base}
       </div>
       {(hasTeacher || editing) && (
-        <div className={`kr-teacher ${editing ? 'editing' : ''}`}>
-          <span className="kr-teacher-tag">T</span>
+        <div className={`kr-teacher ${editing ? 'editing' : ''} ${hasDraft ? 'draft' : ''}`}>
+          <span className="kr-teacher-tag">{hasDraft ? 'GPT' : 'T'}</span>
           {editing ? (
             <div
               className="kr-teacher-edit"
@@ -169,7 +187,7 @@ function KrCell({
             <button className="tbtn primary" onMouseDown={(e) => e.preventDefault()} onClick={save}>
               저장
             </button>
-            <button className="tbtn" onClick={() => setEditing(false)}>
+            <button className="tbtn" onClick={cancel}>
               취소
             </button>
           </>
@@ -179,6 +197,37 @@ function KrCell({
           </button>
         )}
       </div>
+    </td>
+  );
+}
+
+// 각 줄 번역 버튼: GPT 로 기존 KR 다듬기 → teacher 서브셀 초안
+function TranslateButton({
+  row,
+  onDone,
+  onError,
+}: {
+  row: Row;
+  onDone: (id: number, kr: string | null) => void;
+  onError: (msg: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const r = await translateRow(row.text_id);
+      onDone(row.text_id, r.kr);
+    } catch (e) {
+      onError(`번역 실패 (id=${row.text_id}): ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <td className="trans">
+      <button className="tbtn" onClick={run} disabled={busy} title="GPT로 기존 KR 다듬기 → teacher 초안">
+        {busy ? '⏳' : '번역'}
+      </button>
     </td>
   );
 }
@@ -270,6 +319,16 @@ export default function TranslationTool() {
   // EN 이후 7개 언어 중 표시할 하나 (헤더 드롭다운으로 선택)
   const [activeTarget, setActiveTarget] = useState<keyof Row>('en');
   const [promptOpen, setPromptOpen] = useState(false);
+  // GPT 번역 초안 (id → 텍스트, 미저장). 저장/취소 시 제거.
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const setDraft = (id: number, kr: string | null) =>
+    setDrafts((d) => ({ ...d, [id]: kr ?? '' }));
+  const clearDraft = (id: number) =>
+    setDrafts((d) => {
+      const n = { ...d };
+      delete n[id];
+      return n;
+    });
 
   const refreshStats = useCallback(() => {
     getStats().then(setStats).catch(() => {});
@@ -402,7 +461,7 @@ export default function TranslationTool() {
               <col style={{ width: 260 }} />{/* 원문 CN */}
               <col style={{ width: 260 }} />{/* KR 한국어 */}
               <col style={{ width: 260 }} />{/* 선택 언어 */}
-              <col style={{ width: 60 }} />{/* 제한 */}
+              <col style={{ width: 84 }} />{/* 번역 */}
             </colgroup>
             <thead>
               <tr>
@@ -425,7 +484,7 @@ export default function TranslationTool() {
                     ))}
                   </select>
                 </th>
-                <th>제한</th>
+                <th>번역</th>
               </tr>
             </thead>
             <tbody>
@@ -435,7 +494,13 @@ export default function TranslationTool() {
                   <td className="note">{r.note}</td>
                   <EditableCell row={r} col="note_kr" onSaved={onSaved} onError={setErr} />
                   <td className="src">{r.cn}</td>
-                  <KrCell row={r} onTeacherSaved={onTeacherSaved} onError={setErr} />
+                  <KrCell
+                    row={r}
+                    draft={drafts[r.text_id]}
+                    onTeacherSaved={onTeacherSaved}
+                    onClearDraft={clearDraft}
+                    onError={setErr}
+                  />
                   <EditableCell
                     key={activeTarget}
                     row={r}
@@ -443,7 +508,7 @@ export default function TranslationTool() {
                     onSaved={onSaved}
                     onError={setErr}
                   />
-                  <td className="lim">{r.char_limit}</td>
+                  <TranslateButton row={r} onDone={setDraft} onError={setErr} />
                 </tr>
               ))}
             </tbody>

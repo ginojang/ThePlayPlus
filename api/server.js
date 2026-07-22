@@ -1,6 +1,10 @@
 import express from 'express';
 import cors from 'cors';
+import OpenAI from 'openai';
 import { pool, query } from './db.js';
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 const app = express();
 app.use(cors());
@@ -164,6 +168,40 @@ app.patch('/api/texts/:id', asyncH(async (req, res) => {
   } finally {
     client.release();
   }
+}));
+
+async function currentPrompt() {
+  const { rows } = await query('SELECT value FROM app_settings WHERE key = $1', [PROMPT_KEY]);
+  return rows.length ? rows[0].value : DEFAULT_PROMPT;
+}
+
+// GPT 로 기존 KR 다듬기 → kr_teacher 초안 저장
+app.post('/api/translate/:id', asyncH(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
+  if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY 없음' });
+
+  const r = await query('SELECT kr, cn, en FROM game_texts WHERE text_id = $1', [id]);
+  if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
+  const { kr, cn, en } = r.rows[0];
+
+  const prompt = await currentPrompt();
+  const parts = [];
+  if (cn) parts.push(`[원문 CN] ${cn}`);
+  if (en) parts.push(`[영어 참고] ${en}`);
+  parts.push(`[다듬을 한국어] ${kr && kr.trim() !== '' ? kr : '(비어 있음 — 원문을 참고해 한국어로 작성)'}`);
+
+  const resp = await openai.chat.completions.create({
+    model: OPENAI_MODEL,
+    temperature: 0.2,
+    messages: [
+      { role: 'system', content: prompt },
+      { role: 'user', content: parts.join('\n') },
+    ],
+  });
+  const out = (resp.choices[0].message.content || '').trim();
+  // teacher 에 저장하지 않고 초안 결과만 반환 — 검수자가 확인 후 직접 저장한다.
+  res.json({ text_id: id, kr: out, model: OPENAI_MODEL });
 }));
 
 // 번역 프롬프트 조회/저장
