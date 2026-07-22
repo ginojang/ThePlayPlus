@@ -10,6 +10,7 @@ import {
   putPrompt,
   type Row,
   type LangStat,
+  type TranslateResult,
 } from './api';
 
 const nf = new Intl.NumberFormat('ko-KR');
@@ -105,7 +106,7 @@ function KrCell({
   row: Row;
   draft?: string;
   onTeacherSaved: (id: number, kr: string | null) => void;
-  onClearDraft: (id: number) => void;
+  onClearDraft?: (id: number) => void;
   onError: (msg: string) => void;
 }) {
   const base = row.kr ?? '';
@@ -134,7 +135,7 @@ function KrCell({
 
   const cancel = () => {
     setEditing(false);
-    if (hasDraft) onClearDraft(row.text_id);
+    if (hasDraft) onClearDraft?.(row.text_id);
   };
 
   const save = async () => {
@@ -143,7 +144,7 @@ function KrCell({
     try {
       const r = await putTeacher(row.text_id, v);
       onTeacherSaved(row.text_id, r.kr);
-      if (hasDraft) onClearDraft(row.text_id);
+      if (hasDraft) onClearDraft?.(row.text_id);
       setEditing(false);
       setStatus('saved');
       setTimeout(() => setStatus(''), 700);
@@ -201,22 +202,21 @@ function KrCell({
   );
 }
 
-// 각 줄 번역 버튼: GPT 로 기존 KR 다듬기 → teacher 서브셀 초안
+// 각 줄 번역 버튼: GPT 로 KR 번역 생성 → 결과 팝업 (DB 저장 안 함)
 function TranslateButton({
   row,
-  onDone,
+  onResult,
   onError,
 }: {
   row: Row;
-  onDone: (id: number, kr: string | null) => void;
+  onResult: (r: TranslateResult) => void;
   onError: (msg: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const run = async () => {
     setBusy(true);
     try {
-      const r = await translateRow(row.text_id);
-      onDone(row.text_id, r.kr);
+      onResult(await translateRow(row.text_id));
     } catch (e) {
       onError(`번역 실패 (id=${row.text_id}): ${(e as Error).message}`);
     } finally {
@@ -225,10 +225,56 @@ function TranslateButton({
   };
   return (
     <td className="trans">
-      <button className="tbtn" onClick={run} disabled={busy} title="GPT로 기존 KR 다듬기 → teacher 초안">
+      <button className="tbtn" onClick={run} disabled={busy} title="GPT 번역 결과를 팝업으로 표시">
         {busy ? '⏳' : '번역'}
       </button>
     </td>
+  );
+}
+
+// 번역 결과 팝업 (DB 저장 안 함)
+function ResultModal({ data, onClose }: { data: TranslateResult; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(data.kr);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      /* ignore */
+    }
+  };
+  return (
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>GPT 번역 결과 · id {data.text_id}</h2>
+          <button className="tbtn" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        <p className="modal-sub">
+          모델 {data.model} · teacher 샘플 {data.samples}건 사용 · DB에 저장되지 않습니다
+        </p>
+        <div className="result-block">
+          <div className="result-label">기존 KR</div>
+          <div className="result-box base">{data.base || '(없음)'}</div>
+        </div>
+        <div className="result-block">
+          <div className="result-label">GPT 번역</div>
+          <div className="result-box out">{data.kr}</div>
+        </div>
+        <div className="modal-foot">
+          <div style={{ flex: 1 }} />
+          <button className="tbtn" onClick={copy}>
+            {copied ? '복사됨 ✓' : '번역 복사'}
+          </button>
+          <button className="tbtn primary" onClick={onClose}>
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -319,16 +365,8 @@ export default function TranslationTool() {
   // EN 이후 7개 언어 중 표시할 하나 (헤더 드롭다운으로 선택)
   const [activeTarget, setActiveTarget] = useState<keyof Row>('en');
   const [promptOpen, setPromptOpen] = useState(false);
-  // GPT 번역 초안 (id → 텍스트, 미저장). 저장/취소 시 제거.
-  const [drafts, setDrafts] = useState<Record<number, string>>({});
-  const setDraft = (id: number, kr: string | null) =>
-    setDrafts((d) => ({ ...d, [id]: kr ?? '' }));
-  const clearDraft = (id: number) =>
-    setDrafts((d) => {
-      const n = { ...d };
-      delete n[id];
-      return n;
-    });
+  // GPT 번역 결과 팝업 (DB 저장 안 함)
+  const [result, setResult] = useState<TranslateResult | null>(null);
 
   const refreshStats = useCallback(() => {
     getStats().then(setStats).catch(() => {});
@@ -448,6 +486,7 @@ export default function TranslationTool() {
       </div>
 
       {promptOpen && <PromptModal onClose={() => setPromptOpen(false)} />}
+      {result && <ResultModal data={result} onClose={() => setResult(null)} />}
 
       <div className="tablewrap">
         {loading && rows.length === 0 ? (
@@ -494,13 +533,7 @@ export default function TranslationTool() {
                   <td className="note">{r.note}</td>
                   <EditableCell row={r} col="note_kr" onSaved={onSaved} onError={setErr} />
                   <td className="src">{r.cn}</td>
-                  <KrCell
-                    row={r}
-                    draft={drafts[r.text_id]}
-                    onTeacherSaved={onTeacherSaved}
-                    onClearDraft={clearDraft}
-                    onError={setErr}
-                  />
+                  <KrCell row={r} onTeacherSaved={onTeacherSaved} onError={setErr} />
                   <EditableCell
                     key={activeTarget}
                     row={r}
@@ -508,7 +541,7 @@ export default function TranslationTool() {
                     onSaved={onSaved}
                     onError={setErr}
                   />
-                  <TranslateButton row={r} onDone={setDraft} onError={setErr} />
+                  <TranslateButton row={r} onResult={setResult} onError={setErr} />
                 </tr>
               ))}
             </tbody>

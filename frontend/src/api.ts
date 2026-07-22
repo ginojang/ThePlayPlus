@@ -58,11 +58,17 @@ export function patchCell(id: number, col: string, value: string) {
   }).then(j<{ text_id: number; col: string; value: string | null; old: string | null }>);
 }
 
-// GPT 로 기존 KR 다듬기 → teacher 초안 저장, 결과 반환
+export type TranslateResult = {
+  text_id: number;
+  kr: string;
+  base: string | null;
+  samples: number;
+  model: string;
+};
+
+// GPT 로 KR 번역 생성 (teacher few-shot). DB 저장 안 함 — 결과만 반환.
 export function translateRow(id: number) {
-  return fetch(`${API}/translate/${id}`, { method: 'POST' }).then(
-    j<{ text_id: number; kr: string; model: string }>,
-  );
+  return fetch(`${API}/translate/${id}`, { method: 'POST' }).then(j<TranslateResult>);
 }
 
 export const getPrompt = () =>

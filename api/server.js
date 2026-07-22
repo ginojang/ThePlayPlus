@@ -4,7 +4,7 @@ import OpenAI from 'openai';
 import { pool, query } from './db.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 
 const app = express();
 app.use(cors());
@@ -30,15 +30,16 @@ const LANG_META = [
 ];
 
 const PROMPT_KEY = 'translate_prompt';
-const DEFAULT_PROMPT = `너는 모바일 게임 '여신키우기'의 한국어 감수·윤문 전문가다.
-목표는 새로 번역하는 것이 아니라, 이미 번역된 한국어를 최대한 자연스럽게 다듬는 것이다.
+const DEFAULT_PROMPT = `너는 모바일 게임 '여신키우기'의 전문 한국어 번역가다.
+입력으로 [Note한국어](텍스트 용도 설명), [원문CN](중국어 원문), [EN영어](영어 번역)가 주어진다.
+이 정보를 바탕으로 해당 텍스트의 자연스러운 한국어(KR) 번역을 만든다.
 
-작업 규칙:
-- 원문(중국어/영어)의 의미를 바꾸지 말고, 어색한 번역투·문법 오류·부자연스러운 표현만 자연스러운 한국어로 고친다.
-- 게임 UI/대사 맥락과 존댓말 톤을 유지하고, 용어는 일관되게 다듬는다.
-- {0}, {1} 같은 플레이스홀더와 <color=...></color>, <link=...></link> 태그, 줄바꿈(\\n), 공백·기호 서식은 원본 그대로 보존한다.
-- 이미 자연스러운 문장은 억지로 바꾸지 않는다.
-- 설명 없이 다듬은 한국어 결과만 출력한다.`;
+규칙:
+- 원문의 의미를 정확히 전달하되, 자연스럽고 간결한 한국어로 옮긴다.
+- 게임 UI/대사 맥락과 존댓말 톤을 지킨다.
+- {0}, {1} 같은 플레이스홀더와 <color=...></color>, <link=...></link> 태그, 줄바꿈(\\n), 공백·기호 서식은 원문 그대로 보존한다.
+- 아래 예시(검수 확정본)들의 번역 스타일과 용어를 우선적으로 따른다.
+- 설명 없이 한국어 번역 결과만 출력한다.`;
 
 const asyncH = (fn) => (req, res) => fn(req, res).catch((e) => {
   console.error(e);
@@ -175,33 +176,49 @@ async function currentPrompt() {
   return rows.length ? rows[0].value : DEFAULT_PROMPT;
 }
 
-// GPT 로 기존 KR 다듬기 → kr_teacher 초안 저장
+// 입력(Note한국어/원문CN/EN영어)을 few-shot 형식으로 포맷
+function fmtInput({ note_kr, cn, en }) {
+  const p = [];
+  if (note_kr) p.push(`[Note한국어] ${note_kr}`);
+  if (cn) p.push(`[원문CN] ${cn}`);
+  if (en) p.push(`[EN영어] ${en}`);
+  if (p.length === 0) p.push('(정보 없음)');
+  return p.join('\n');
+}
+
+// GPT 로 KR 번역 생성 (프롬프트 + teacher 전체를 few-shot 샘플로 사용). DB 저장 안 함.
 app.post('/api/translate/:id', asyncH(async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
   if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY 없음' });
 
-  const r = await query('SELECT kr, cn, en FROM game_texts WHERE text_id = $1', [id]);
+  const r = await query('SELECT kr, note_kr, cn, en FROM game_texts WHERE text_id = $1', [id]);
   if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
-  const { kr, cn, en } = r.rows[0];
+  const target = r.rows[0];
+
+  // teacher(검수 확정) 전체를 few-shot 예시로: 입력(note_kr/cn/en) → 출력(teacher kr)
+  const s = await query(
+    `SELECT t.kr AS teacher_kr, g.note_kr, g.cn, g.en
+       FROM kr_teacher t JOIN game_texts g ON g.text_id = t.text_id
+       ORDER BY t.text_id`,
+  );
 
   const prompt = await currentPrompt();
-  const parts = [];
-  if (cn) parts.push(`[원문 CN] ${cn}`);
-  if (en) parts.push(`[영어 참고] ${en}`);
-  parts.push(`[다듬을 한국어] ${kr && kr.trim() !== '' ? kr : '(비어 있음 — 원문을 참고해 한국어로 작성)'}`);
+  const messages = [{ role: 'system', content: prompt }];
+  for (const ex of s.rows) {
+    messages.push({ role: 'user', content: fmtInput(ex) });
+    messages.push({ role: 'assistant', content: ex.teacher_kr });
+  }
+  messages.push({ role: 'user', content: fmtInput(target) });
 
   const resp = await openai.chat.completions.create({
     model: OPENAI_MODEL,
     temperature: 0.2,
-    messages: [
-      { role: 'system', content: prompt },
-      { role: 'user', content: parts.join('\n') },
-    ],
+    messages,
   });
   const out = (resp.choices[0].message.content || '').trim();
-  // teacher 에 저장하지 않고 초안 결과만 반환 — 검수자가 확인 후 직접 저장한다.
-  res.json({ text_id: id, kr: out, model: OPENAI_MODEL });
+  // 결과만 반환 (DB 저장 안 함). base = 기존 KR (팝업 비교용).
+  res.json({ text_id: id, kr: out, base: target.kr, samples: s.rows.length, model: OPENAI_MODEL });
 }));
 
 // 번역 프롬프트 조회/저장
