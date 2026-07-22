@@ -132,8 +132,23 @@ function KrCell({
   const base = row.kr ?? '';
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState<'' | 'saving' | 'saved' | 'error'>('');
+  const [applied, setApplied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLDivElement>(null); // 검토 편집용(플래그 행)
+
+  // 수정만 적용(원본 KR 저장, 플래그 유지)
+  const applyEdit = async () => {
+    const edited = baseRef.current?.textContent ?? base;
+    if (edited === base) return;
+    try {
+      await patchCell(row.text_id, 'kr', edited);
+      onSaved(row.text_id, 'kr', edited);
+      setApplied(true);
+      setTimeout(() => setApplied(false), 900);
+    } catch (e) {
+      onError(`수정적용 실패 (id=${row.text_id}): ${(e as Error).message}`);
+    }
+  };
 
   // 플래그 행: base 를 편집 가능하게, 원본값으로 초기화
   useEffect(() => {
@@ -200,6 +215,13 @@ function KrCell({
           {row.flag_before != null && row.flag_before !== base && (
             <span className="flag-before" title="자동 수정 전 원본">전: {row.flag_before}</span>
           )}
+          <button
+            className="tbtn"
+            title="수정 적용 — 원본 KR 저장 (플래그는 유지)"
+            onClick={applyEdit}
+          >
+            {applied ? '적용됨 ✓' : '수정적용'}
+          </button>
           <button
             className="tbtn primary"
             title="검토 완료 — 수정했으면 원본 KR 저장 후 마킹 해제"
