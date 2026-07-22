@@ -245,16 +245,42 @@ function TranslateButton({
   );
 }
 
-// 번역 결과 팝업 (DB 저장 안 함)
-function ResultModal({ data, onClose }: { data: TranslateResult; onClose: () => void }) {
+// 번역 결과 팝업 — 확인 후 teacher(DB) 저장 가능
+function ResultModal({
+  data,
+  onClose,
+  onSaved,
+}: {
+  data: TranslateResult;
+  onClose: () => void;
+  onSaved: (id: number, kr: string | null) => void;
+}) {
   const [copied, setCopied] = useState(false);
+  const [text, setText] = useState(data.kr);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState('');
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(data.kr);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch {
       /* ignore */
+    }
+  };
+  const save = async () => {
+    setSaving(true);
+    setErr('');
+    try {
+      const r = await putTeacher(data.text_id, text);
+      onSaved(data.text_id, r.kr);
+      setSaved(true);
+      setTimeout(onClose, 600);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setSaving(false);
     }
   };
   return (
@@ -274,16 +300,26 @@ function ResultModal({ data, onClose }: { data: TranslateResult; onClose: () => 
           <div className="result-box base">{data.base || '(없음)'}</div>
         </div>
         <div className="result-block">
-          <div className="result-label">GPT 번역</div>
-          <div className="result-box out">{data.kr}</div>
+          <div className="result-label">GPT 번역 (저장 전 수정 가능)</div>
+          <textarea
+            className="result-box out edit"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            spellCheck={false}
+          />
         </div>
         <div className="modal-foot">
+          {err && <span style={{ color: '#d03b3b' }}>⚠ {err}</span>}
+          {saved && <span style={{ color: 'var(--good)' }}>저장됨 ✓</span>}
           <div style={{ flex: 1 }} />
           <button className="tbtn" onClick={copy}>
-            {copied ? '복사됨 ✓' : '번역 복사'}
+            {copied ? '복사됨 ✓' : '복사'}
           </button>
-          <button className="tbtn primary" onClick={onClose}>
+          <button className="tbtn" onClick={onClose}>
             닫기
+          </button>
+          <button className="tbtn primary" onClick={save} disabled={saving || saved}>
+            {saving ? '저장 중…' : 'teacher로 저장'}
           </button>
         </div>
       </div>
@@ -499,7 +535,13 @@ export default function TranslationTool() {
       </div>
 
       {promptOpen && <PromptModal onClose={() => setPromptOpen(false)} />}
-      {result && <ResultModal data={result} onClose={() => setResult(null)} />}
+      {result && (
+        <ResultModal
+          data={result}
+          onClose={() => setResult(null)}
+          onSaved={onTeacherSaved}
+        />
+      )}
 
       <div className="tablewrap">
         {loading && rows.length === 0 ? (
