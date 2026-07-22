@@ -14,6 +14,8 @@
   --saving: #eda100;
   --kr-tint: #eef4ff;
   --kr-tint-head: #dfeafd;
+  --bnd-manual: #ffe4b0;
+  --bnd-auto: #e4d9f7;
   --border: rgba(11, 11, 11, 0.1);
   color-scheme: light;
 }
@@ -34,6 +36,8 @@
     --saving: #c98500;
     --kr-tint: #16273a;
     --kr-tint-head: #1c3350;
+    --bnd-manual: #4a3d12;
+    --bnd-auto: #2a1f47;
     --border: rgba(255, 255, 255, 0.1);
     color-scheme: dark;
   }
@@ -265,6 +269,10 @@ th.kr-col { background: var(--kr-tint-head); }
 td.kr-col { background: var(--kr-tint); }
 
 td.empty { background: var(--missing-bg); }
+
+/* 검수 경계 표시: 수동 검수 끝(초특가) / 자동 검수 시작(일일 구매 제한) */
+td.bnd-manual { background: var(--bnd-manual); }
+td.bnd-auto { background: var(--bnd-auto); }
 
 /* KR 셀 내부: 기본 KR(읽기전용) + teacher 서브셀 + 버튼 */
 .kr-base {

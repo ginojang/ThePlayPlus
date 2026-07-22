@@ -15,6 +15,10 @@ import {
 
 const nf = new Intl.NumberFormat('ko-KR');
 
+// 검수 경계: 여기(초특가)까지 수동 검수, 다음(일일 구매 제한)부터 자동 검수
+const MANUAL_END_ID = 11140503; // '초특가'
+const AUTO_START_ID = 11140504; // '일일 구매 제한'
+
 // KR 한국어 = 주 번역 대상. 원문 CN 바로 오른쪽에 배치 + 배경색 강조.
 const KR: { col: keyof Row; label: string } = { col: 'kr', label: 'KR 한국어' };
 // 나머지 편집 대상 언어 컬럼 (원문 CN 은 읽기전용 소스)
@@ -154,8 +158,21 @@ function KrCell({
     }
   };
 
+  const boundary =
+    row.text_id === MANUAL_END_ID
+      ? 'bnd-manual'
+      : row.text_id === AUTO_START_ID
+        ? 'bnd-auto'
+        : '';
+  const boundaryTitle =
+    row.text_id === MANUAL_END_ID
+      ? '여기까지 수동 검수'
+      : row.text_id === AUTO_START_ID
+        ? '여기부터 자동 검수'
+        : undefined;
+
   return (
-    <td className={`kr-col ${base === '' ? 'empty' : ''} ${status}`}>
+    <td className={`kr-col ${boundary} ${base === '' ? 'empty' : ''} ${status}`} title={boundaryTitle}>
       <div className="kr-base" title="기본 KR (읽기 전용)">
         {base}
       </div>
