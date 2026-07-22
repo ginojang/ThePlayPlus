@@ -30,15 +30,17 @@ const LANG_META = [
 ];
 
 const PROMPT_KEY = 'translate_prompt';
-const DEFAULT_PROMPT = `너는 모바일 게임 '여신키우기'의 전문 한국어 번역가다.
-입력으로 [Note한국어](텍스트 용도 설명), [원문CN](중국어 원문), [EN영어](영어 번역)가 주어진다.
-이 정보를 바탕으로 해당 텍스트의 자연스러운 한국어(KR) 번역을 만든다.
+const DEFAULT_PROMPT = `너는 모바일 게임 '여신키우기'의 한국어 감수·수정 전문가다.
+새로 번역하는 것이 아니라, [기존 한국어]에 있는 어색한 표현·오류를 아래 규칙대로 수정한다.
+입력으로 [Note한국어](용도 설명), [원문CN](중국어 원문), [EN영어](영어 번역), [기존 한국어](수정 대상)가 주어진다.
 
 규칙:
 - 원문의 의미를 정확히 전달하되, 자연스럽고 간결한 한국어로 옮긴다.
 - 게임 UI/대사 맥락과 존댓말 톤을 지킨다.
 - {0}, {1} 같은 플레이스홀더와 <color=...></color>, <link=...></link> 태그, 줄바꿈(\\n), 공백·기호 서식은 원문 그대로 보존한다.
 - 아래 예시(검수 확정본)들의 번역 스타일과 용어를 우선적으로 따른다.
+- '여신계약'은 원래 게임 이름이고 '여신키우기'로 이름이 변경됨, '여신계약' 은 모두 '여신키우기' 로 변경 수정 해야 한다.
+- 기존 번역에서는 사용자를 부르는 호칭이 '소환사' 임, 모두 '용사'로 변경 수정해야 한다.
 - 설명 없이 한국어 번역 결과만 출력한다.`;
 
 const asyncH = (fn) => (req, res) => fn(req, res).catch((e) => {
@@ -176,13 +178,13 @@ async function currentPrompt() {
   return rows.length ? rows[0].value : DEFAULT_PROMPT;
 }
 
-// 입력(Note한국어/원문CN/EN영어)을 few-shot 형식으로 포맷
-function fmtInput({ note_kr, cn, en }) {
+// 입력(Note한국어/원문CN/EN영어/기존 한국어)을 few-shot 형식으로 포맷
+function fmtInput({ note_kr, cn, en, kr }) {
   const p = [];
   if (note_kr) p.push(`[Note한국어] ${note_kr}`);
   if (cn) p.push(`[원문CN] ${cn}`);
   if (en) p.push(`[EN영어] ${en}`);
-  if (p.length === 0) p.push('(정보 없음)');
+  p.push(`[기존 한국어] ${kr && String(kr).trim() !== '' ? kr : '(비어 있음)'}`);
   return p.join('\n');
 }
 
@@ -196,9 +198,9 @@ app.post('/api/translate/:id', asyncH(async (req, res) => {
   if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
   const target = r.rows[0];
 
-  // teacher(검수 확정) 전체를 few-shot 예시로: 입력(note_kr/cn/en) → 출력(teacher kr)
+  // teacher(검수 확정) 전체를 few-shot 예시로: 입력(note/cn/en + 수정 전 base_kr) → 출력(수정 후 teacher kr)
   const s = await query(
-    `SELECT t.kr AS teacher_kr, g.note_kr, g.cn, g.en
+    `SELECT t.kr AS teacher_kr, t.base_kr, g.note_kr, g.cn, g.en
        FROM kr_teacher t JOIN game_texts g ON g.text_id = t.text_id
        ORDER BY t.text_id`,
   );
@@ -206,7 +208,10 @@ app.post('/api/translate/:id', asyncH(async (req, res) => {
   const prompt = await currentPrompt();
   const messages = [{ role: 'system', content: prompt }];
   for (const ex of s.rows) {
-    messages.push({ role: 'user', content: fmtInput(ex) });
+    messages.push({
+      role: 'user',
+      content: fmtInput({ note_kr: ex.note_kr, cn: ex.cn, en: ex.en, kr: ex.base_kr }),
+    });
     messages.push({ role: 'assistant', content: ex.teacher_kr });
   }
   messages.push({ role: 'user', content: fmtInput(target) });
