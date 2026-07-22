@@ -256,7 +256,7 @@ function TranslateButton({
   );
 }
 
-// 번역 결과 팝업 — 확인 후 teacher(DB) 저장 가능
+// 번역 결과 팝업 — 확인 후 원본 KR(game_texts.kr) 저장
 function ResultModal({
   data,
   onClose,
@@ -264,7 +264,7 @@ function ResultModal({
 }: {
   data: TranslateResult;
   onClose: () => void;
-  onSaved: (id: number, kr: string | null) => void;
+  onSaved: (id: number, col: keyof Row, v: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [text, setText] = useState(data.kr);
@@ -284,8 +284,8 @@ function ResultModal({
     setSaving(true);
     setErr('');
     try {
-      const r = await putTeacher(data.text_id, text);
-      onSaved(data.text_id, r.kr);
+      await patchCell(data.text_id, 'kr', text);
+      onSaved(data.text_id, 'kr', text);
       setSaved(true);
       setTimeout(onClose, 600);
     } catch (e) {
@@ -304,7 +304,7 @@ function ResultModal({
           </button>
         </div>
         <p className="modal-sub">
-          모델 {data.model} · teacher 샘플 {data.samples}건 사용 · DB에 저장되지 않습니다
+          모델 {data.model} · teacher 샘플 {data.samples}건 사용 · 저장 시 원본 KR(game_texts)이 갱신됩니다
         </p>
         <div className="result-block">
           <div className="result-label">기존 KR</div>
@@ -330,7 +330,7 @@ function ResultModal({
             닫기
           </button>
           <button className="tbtn primary" onClick={save} disabled={saving || saved}>
-            {saving ? '저장 중…' : 'teacher로 저장'}
+            {saving ? '저장 중…' : '원본 KR 저장'}
           </button>
         </div>
       </div>
@@ -559,11 +559,7 @@ export default function TranslationTool() {
 
       {promptOpen && <PromptModal onClose={() => setPromptOpen(false)} />}
       {result && (
-        <ResultModal
-          data={result}
-          onClose={() => setResult(null)}
-          onSaved={onTeacherSaved}
-        />
+        <ResultModal data={result} onClose={() => setResult(null)} onSaved={onSaved} />
       )}
 
       <div className="tablewrap">
