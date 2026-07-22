@@ -121,6 +121,10 @@ body { margin: 0; }
   color: #fff;
   border-color: var(--good);
 }
+.toggle-btn.flag.on {
+  background: var(--saving);
+  border-color: var(--saving);
+}
 .controls .pageinfo {
   font-size: 0.8rem;
   color: var(--text-2);
@@ -284,6 +288,32 @@ td.region-manual { background: var(--region-manual); }
 td.region-auto { background: var(--region-auto); }
 
 td.empty { background: var(--missing-bg); }
+
+/* 검토 마킹 */
+td.kr-col.flagged { box-shadow: inset 3px 0 0 var(--saving); }
+.flag-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 5px 8px 0;
+}
+.flag-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--saving);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.flag-before {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-decoration: line-through;
+  flex: 1;
+  min-width: 80px;
+}
 
 /* KR 셀 내부: 기본 KR(읽기전용) + teacher 서브셀 + 버튼 */
 .kr-base {

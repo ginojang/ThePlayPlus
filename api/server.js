@@ -74,7 +74,7 @@ app.get('/api/stats', asyncH(async (_req, res) => {
 // q=검색어  field=검색대상컬럼(기본 전체)  missing=<lang>(해당 언어 비어있는 행만)
 // limit(기본100,최대500) offset
 app.get('/api/texts', asyncH(async (req, res) => {
-  const { q, field, missing, teacher } = req.query;
+  const { q, field, missing, teacher, flagged } = req.query;
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
 
@@ -101,6 +101,10 @@ app.get('/api/texts', asyncH(async (req, res) => {
   if (teacher === '1' || teacher === 'true') {
     where.push(`EXISTS (SELECT 1 FROM kr_teacher t WHERE t.text_id = game_texts.text_id)`);
   }
+  // 검토 필요(마킹) 행만
+  if (flagged === '1' || flagged === 'true') {
+    where.push(`EXISTS (SELECT 1 FROM review_flags rf WHERE rf.text_id = game_texts.text_id)`);
+  }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
   const countRes = await query(`SELECT count(*) AS n FROM game_texts ${whereSql}`, params);
@@ -115,15 +119,20 @@ app.get('/api/texts', asyncH(async (req, res) => {
     params,
   );
   const rows = dataRes.rows;
-  // teacher(검수 확정 KR) 값 병합
   if (rows.length) {
     const ids = rows.map((r) => String(r.text_id));
-    const tRes = await query(
-      `SELECT text_id, kr FROM kr_teacher WHERE text_id = ANY($1::bigint[])`,
-      [ids],
-    );
-    const map = new Map(tRes.rows.map((r) => [String(r.text_id), r.kr]));
-    for (const r of rows) r.kr_teacher = map.get(String(r.text_id)) ?? null;
+    // teacher(검수 확정 KR) 병합
+    const tRes = await query(`SELECT text_id, kr FROM kr_teacher WHERE text_id = ANY($1::bigint[])`, [ids]);
+    const tMap = new Map(tRes.rows.map((r) => [String(r.text_id), r.kr]));
+    // 검토 마킹 병합 (원본값 before 포함)
+    const fRes = await query(`SELECT text_id, before_kr FROM review_flags WHERE text_id = ANY($1::bigint[])`, [ids]);
+    const fMap = new Map(fRes.rows.map((r) => [String(r.text_id), r.before_kr]));
+    for (const r of rows) {
+      r.kr_teacher = tMap.get(String(r.text_id)) ?? null;
+      const has = fMap.has(String(r.text_id));
+      r.flagged = has;
+      r.flag_before = has ? fMap.get(String(r.text_id)) : null;
+    }
   }
   res.json({ total, limit, offset, rows });
 }));
@@ -229,6 +238,14 @@ app.post('/api/translate/:id', asyncH(async (req, res) => {
   const out = (resp.choices[0].message.content || '').trim();
   // 결과만 반환 (DB 저장 안 함). base = 기존 KR (팝업 비교용).
   res.json({ text_id: id, kr: out, base: target.kr, samples: s.rows.length, model: OPENAI_MODEL });
+}));
+
+// 검토 마킹 해제 (검토 완료)
+app.delete('/api/flag/:id', asyncH(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
+  await query('DELETE FROM review_flags WHERE text_id = $1', [id]);
+  res.json({ text_id: id, flagged: false });
 }));
 
 // 번역 프롬프트 조회/저장

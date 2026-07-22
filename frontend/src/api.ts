@@ -7,6 +7,8 @@ export type Row = {
   note: string | null;
   note_kr: string | null;
   kr_teacher: string | null;
+  flagged?: boolean;
+  flag_before?: string | null;
   cn: string | null;
   en: string | null;
   jp: string | null;
@@ -26,6 +28,7 @@ export type ListParams = {
   q?: string;
   field?: string;
   teacher?: boolean;
+  flagged?: boolean;
   limit: number;
   offset: number;
 };
@@ -43,6 +46,7 @@ export function getTexts(p: ListParams) {
   if (p.q) u.set('q', p.q);
   if (p.field) u.set('field', p.field);
   if (p.teacher) u.set('teacher', '1');
+  if (p.flagged) u.set('flagged', '1');
   u.set('limit', String(p.limit));
   u.set('offset', String(p.offset));
   return fetch(`${API}/texts?${u}`).then(
@@ -80,6 +84,13 @@ export function putPrompt(prompt: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt }),
   }).then(j<{ prompt: string }>);
+}
+
+// 검토 마킹 해제
+export function clearFlag(id: number) {
+  return fetch(`${API}/flag/${id}`, { method: 'DELETE' }).then(
+    j<{ text_id: number; flagged: boolean }>,
+  );
 }
 
 // teacher(검수 확정 KR) 저장 — 빈 값이면 삭제

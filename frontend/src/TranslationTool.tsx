@@ -5,6 +5,7 @@ import {
   getTexts,
   patchCell,
   putTeacher,
+  clearFlag,
   translateRow,
   getPrompt,
   putPrompt,
@@ -21,7 +22,7 @@ const AUTO_START_ID = 11140504; // '일일 구매 제한'
 
 // 마지막 검색/필터/페이지 위치를 기억 (새로고침 후 복원)
 const VIEW_KEY = 'tpp_view_v1';
-type ViewState = { q: string; field: string; teacherOnly: boolean; limit: number; offset: number };
+type ViewState = { q: string; field: string; teacherOnly: boolean; flaggedOnly: boolean; limit: number; offset: number };
 function loadView(): Partial<ViewState> {
   try {
     return JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
@@ -116,12 +117,14 @@ function KrCell({
   draft,
   onTeacherSaved,
   onClearDraft,
+  onFlagCleared,
   onError,
 }: {
   row: Row;
   draft?: string;
   onTeacherSaved: (id: number, kr: string | null) => void;
   onClearDraft?: (id: number) => void;
+  onFlagCleared?: (id: number) => void;
   onError: (msg: string) => void;
 }) {
   const base = row.kr ?? '';
@@ -179,7 +182,32 @@ function KrCell({
         : undefined;
 
   return (
-    <td className={`kr-col ${region} ${base === '' ? 'empty' : ''} ${status}`} title={boundaryTitle}>
+    <td
+      className={`kr-col ${region} ${row.flagged ? 'flagged' : ''} ${base === '' ? 'empty' : ''} ${status}`}
+      title={boundaryTitle}
+    >
+      {row.flagged && (
+        <div className="flag-bar">
+          <span className="flag-tag" title="자동 다듬기로 문구가 바뀐 행 — 검토 필요">⚑ 검토</span>
+          {row.flag_before != null && row.flag_before !== base && (
+            <span className="flag-before" title="자동 수정 전 원본">전: {row.flag_before}</span>
+          )}
+          <button
+            className="tbtn"
+            title="검토 완료 — 마킹 해제"
+            onClick={async () => {
+              try {
+                await clearFlag(row.text_id);
+                onFlagCleared?.(row.text_id);
+              } catch (e) {
+                onError(`마킹 해제 실패 (id=${row.text_id}): ${(e as Error).message}`);
+              }
+            }}
+          >
+            검토완료
+          </button>
+        </div>
+      )}
       <div className="kr-base" title="기본 KR (읽기 전용)">
         {base}
       </div>
@@ -424,6 +452,7 @@ export default function TranslationTool() {
   const [q, setQ] = useState(saved0.q ?? '');
   const [field, setField] = useState(saved0.field ?? '');
   const [teacherOnly, setTeacherOnly] = useState(saved0.teacherOnly ?? false);
+  const [flaggedOnly, setFlaggedOnly] = useState(saved0.flaggedOnly ?? false);
   const [limit, setLimit] = useState(saved0.limit ?? 100);
   const [offset, setOffset] = useState(saved0.offset ?? 0);
   // EN 이후 7개 언어 중 표시할 하나 (헤더 드롭다운으로 선택)
@@ -457,16 +486,16 @@ export default function TranslationTool() {
       return;
     }
     setOffset(0);
-  }, [qDebounced, field, teacherOnly, limit]);
+  }, [qDebounced, field, teacherOnly, flaggedOnly, limit]);
 
   // 뷰 상태를 localStorage 에 저장 (위치 기억)
   useEffect(() => {
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ q, field, teacherOnly, limit, offset }));
-  }, [q, field, teacherOnly, limit, offset]);
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ q, field, teacherOnly, flaggedOnly, limit, offset }));
+  }, [q, field, teacherOnly, flaggedOnly, limit, offset]);
 
   useEffect(() => {
     setLoading(true);
-    getTexts({ q: qDebounced, field, teacher: teacherOnly, limit, offset })
+    getTexts({ q: qDebounced, field, teacher: teacherOnly, flagged: flaggedOnly, limit, offset })
       .then((d) => {
         setRows(d.rows);
         setTotal(d.total);
@@ -474,7 +503,7 @@ export default function TranslationTool() {
       })
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
-  }, [qDebounced, field, teacherOnly, limit, offset, reloadKey]);
+  }, [qDebounced, field, teacherOnly, flaggedOnly, limit, offset, reloadKey]);
 
   const onSaved = (id: number, col: keyof Row, v: string) => {
     setRows((rs) => rs.map((r) => (r.text_id === id ? { ...r, [col]: v === '' ? null : v } : r)));
@@ -485,6 +514,10 @@ export default function TranslationTool() {
   const onTeacherSaved = (id: number, kr: string | null) => {
     setRows((rs) => rs.map((r) => (r.text_id === id ? { ...r, kr_teacher: kr } : r)));
     setSavedCount((n) => n + 1);
+  };
+
+  const onFlagCleared = (id: number) => {
+    setRows((rs) => rs.map((r) => (r.text_id === id ? { ...r, flagged: false } : r)));
   };
 
   const page = Math.floor(offset / limit) + 1;
@@ -531,6 +564,13 @@ export default function TranslationTool() {
             title="검수 확정(teacher)이 있는 행만 보기"
           >
             {teacherOnly ? '✓ ' : ''}티쳐 수정본만
+          </button>
+          <button
+            className={`toggle-btn flag ${flaggedOnly ? 'on' : ''}`}
+            onClick={() => setFlaggedOnly((v) => !v)}
+            title="검토 필요로 마킹된 행만 보기"
+          >
+            {flaggedOnly ? '✓ ' : '⚑ '}검토 필요만
           </button>
 
           <div className="spacer" />
@@ -617,7 +657,12 @@ export default function TranslationTool() {
                   <td className="note">{r.note}</td>
                   <EditableCell row={r} col="note_kr" onSaved={onSaved} onError={setErr} />
                   <td className="src">{r.cn}</td>
-                  <KrCell row={r} onTeacherSaved={onTeacherSaved} onError={setErr} />
+                  <KrCell
+                    row={r}
+                    onTeacherSaved={onTeacherSaved}
+                    onFlagCleared={onFlagCleared}
+                    onError={setErr}
+                  />
                   <EditableCell
                     key={activeTarget}
                     row={r}
