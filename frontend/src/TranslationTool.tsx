@@ -184,7 +184,7 @@ export default function TranslationTool() {
 
   const [q, setQ] = useState('');
   const [field, setField] = useState('');
-  const [missing, setMissing] = useState('');
+  const [teacherOnly, setTeacherOnly] = useState(false);
   const [limit, setLimit] = useState(100);
   const [offset, setOffset] = useState(0);
   // EN 이후 7개 언어 중 표시할 하나 (헤더 드롭다운으로 선택)
@@ -207,11 +207,11 @@ export default function TranslationTool() {
 
   useEffect(() => {
     setOffset(0);
-  }, [qDebounced, field, missing, limit]);
+  }, [qDebounced, field, teacherOnly, limit]);
 
   useEffect(() => {
     setLoading(true);
-    getTexts({ q: qDebounced, field, missing, limit, offset })
+    getTexts({ q: qDebounced, field, teacher: teacherOnly, limit, offset })
       .then((d) => {
         setRows(d.rows);
         setTotal(d.total);
@@ -219,7 +219,7 @@ export default function TranslationTool() {
       })
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
-  }, [qDebounced, field, missing, limit, offset]);
+  }, [qDebounced, field, teacherOnly, limit, offset]);
 
   const onSaved = (id: number, col: keyof Row, v: string) => {
     setRows((rs) => rs.map((r) => (r.text_id === id ? { ...r, [col]: v === '' ? null : v } : r)));
@@ -245,15 +245,13 @@ export default function TranslationTool() {
           <span className="sub">game_texts · {stats ? nf.format(stats.total_strings) : '…'}개 문자열</span>
           <div className="chips">
             {stats?.languages.map((l) => (
-              <button
+              <span
                 key={l.code}
                 className={`chip ${l.pct >= 100 ? 'full' : l.pct < 50 ? 'low' : ''}`}
-                title={`${l.label}: ${nf.format(l.filled)} 완료 / ${nf.format(l.missing)} 미번역 — 클릭 시 미번역만 보기`}
-                onClick={() => setMissing((m) => (m === l.code ? '' : l.code))}
-                style={missing === l.code ? { outline: '2px solid var(--accent)' } : undefined}
+                title={`${l.label}: ${nf.format(l.filled)} 완료 / ${nf.format(l.missing)} 미번역`}
               >
                 {l.flag} <b>{l.pct}%</b>
-              </button>
+              </span>
             ))}
           </div>
         </div>
@@ -272,14 +270,13 @@ export default function TranslationTool() {
               </option>
             ))}
           </select>
-          <select value={missing} onChange={(e) => setMissing(e.target.value)} title="미번역 필터">
-            <option value="">미번역 필터: 없음</option>
-            {TARGETS.map((t) => (
-              <option key={t.col} value={t.col as string}>
-                미번역: {t.label}
-              </option>
-            ))}
-          </select>
+          <button
+            className={`toggle-btn ${teacherOnly ? 'on' : ''}`}
+            onClick={() => setTeacherOnly((v) => !v)}
+            title="검수 확정(teacher)이 있는 행만 보기"
+          >
+            {teacherOnly ? '✓ ' : ''}티쳐 수정본만
+          </button>
 
           <div className="spacer" />
           <span className="pageinfo">

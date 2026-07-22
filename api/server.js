@@ -51,7 +51,7 @@ app.get('/api/stats', asyncH(async (_req, res) => {
 // q=검색어  field=검색대상컬럼(기본 전체)  missing=<lang>(해당 언어 비어있는 행만)
 // limit(기본100,최대500) offset
 app.get('/api/texts', asyncH(async (req, res) => {
-  const { q, field, missing } = req.query;
+  const { q, field, missing, teacher } = req.query;
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
 
@@ -73,6 +73,10 @@ app.get('/api/texts', asyncH(async (req, res) => {
   }
   if (missing && LANG_COLS.includes(String(missing))) {
     where.push(`(${missing} IS NULL OR ${missing} = '')`);
+  }
+  // teacher(검수 확정 KR) 있는 행만
+  if (teacher === '1' || teacher === 'true') {
+    where.push(`EXISTS (SELECT 1 FROM kr_teacher t WHERE t.text_id = game_texts.text_id)`);
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 

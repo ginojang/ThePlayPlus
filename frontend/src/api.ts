@@ -25,7 +25,7 @@ export type LangStat = Lang & { filled: number; missing: number; pct: number };
 export type ListParams = {
   q?: string;
   field?: string;
-  missing?: string;
+  teacher?: boolean;
   limit: number;
   offset: number;
 };
@@ -42,7 +42,7 @@ export function getTexts(p: ListParams) {
   const u = new URLSearchParams();
   if (p.q) u.set('q', p.q);
   if (p.field) u.set('field', p.field);
-  if (p.missing) u.set('missing', p.missing);
+  if (p.teacher) u.set('teacher', '1');
   u.set('limit', String(p.limit));
   u.set('offset', String(p.offset));
   return fetch(`${API}/texts?${u}`).then(

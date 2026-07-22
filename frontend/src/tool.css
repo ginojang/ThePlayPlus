@@ -112,6 +112,11 @@ body { margin: 0; }
   cursor: pointer;
 }
 .controls button:disabled { opacity: 0.4; cursor: default; }
+.toggle-btn.on {
+  background: var(--good);
+  color: #fff;
+  border-color: var(--good);
+}
 .controls .pageinfo {
   font-size: 0.8rem;
   color: var(--text-2);
