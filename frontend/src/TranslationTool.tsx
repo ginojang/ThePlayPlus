@@ -158,21 +158,17 @@ function KrCell({
     }
   };
 
-  const boundary =
-    row.text_id === MANUAL_END_ID
-      ? 'bnd-manual'
-      : row.text_id === AUTO_START_ID
-        ? 'bnd-auto'
-        : '';
+  // 검수 구간: 처음~초특가(11140503) 수동, 일일 구매 제한(11140504)~끝 자동
+  const region = row.text_id <= MANUAL_END_ID ? 'region-manual' : 'region-auto';
   const boundaryTitle =
     row.text_id === MANUAL_END_ID
-      ? '여기까지 수동 검수'
+      ? '↑ 여기까지 수동 검수'
       : row.text_id === AUTO_START_ID
-        ? '여기부터 자동 검수'
+        ? '↓ 여기부터 자동 검수'
         : undefined;
 
   return (
-    <td className={`kr-col ${boundary} ${base === '' ? 'empty' : ''} ${status}`} title={boundaryTitle}>
+    <td className={`kr-col ${region} ${base === '' ? 'empty' : ''} ${status}`} title={boundaryTitle}>
       <div className="kr-base" title="기본 KR (읽기 전용)">
         {base}
       </div>
